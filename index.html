@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chase the Moving Target Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            position: relative;
+        }
+        canvas {
+            border: 1px solid #000;
+            background-color: #fff;
+        }
+        #message, #gameOver {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2em;
+            display: none;
+        }
+        #message {
+            color: green;
+        }
+        #gameOver {
+            color: red;
+        }
+        #restartButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1em;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .control-button {
+            width: 50px;
+            height: 50px;
+            margin: 5px;
+            font-size: 2em;
+            text-align: center;
+            vertical-align: middle;
+            background-color: #ddd;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="500" height="500"></canvas>
+<div id="message">YAY You Won!</div>
+<div id="gameOver">Game Over</div>
+<button id="restartButton" onclick="restartGame()">Restart</button>
+
+<div class="controls">
+    <div class="control-button" id="left">←</div>
+    <div class="control-button" id="up">↑</div>
+    <div class="control-button" id="down">↓</div>
+    <div class="control-button" id="right">→</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const message = document.getElementById('message');
+    const gameOverMessage = document.getElementById('gameOver');
+    const restartButton = document.getElementById('restartButton');
+
+    const squareSize = 20;
+    const speed = 5;
+    const targetSpeed = 2;
+    let playerX, playerY, targetX, targetY, targetDirectionX, targetDirectionY;
+    let targetMovement;
+
+    const obstacles = [];
+
+    function drawSquare(x, y, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, squareSize, squareSize);
+    }
+
+    function drawObstacles() {
+        ctx.fillStyle = 'black';
+        obstacles.forEach(obstacle => {
+            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawSquare(playerX, playerY, 'blue');
+        drawSquare(targetX, targetY, 'red');
+        drawObstacles();
+    }
+
+    function updatePosition(direction) {
+        let newX = playerX;
+        let newY = playerY;
+
+        switch(direction) {
+            case 'ArrowUp':
+                newY -= speed;
+                break;
+            case 'ArrowDown':
+                newY += speed;
+                break;
+            case 'ArrowLeft':
+                newX -= speed;
+                break;
+            case 'ArrowRight':
+                newX += speed;
+                break;
+        }
+
+        if (!checkCollision(newX, newY)) {
+            playerX = newX;
+            playerY = newY;
+        }
+        
+        checkWin();
+        draw();
+    }
+
+    function moveTarget() {
+        targetX += targetSpeed * targetDirectionX;
+        targetY += targetSpeed * targetDirectionY;
+
+        if (targetX <= 0 || targetX + squareSize >= canvas.width) {
+            targetDirectionX *= -1;
+        }
+        if (targetY <= 0 || targetY + squareSize >= canvas.height) {
+            targetDirectionY *= -1;
+        }
+    }
+
+    function checkCollision(x, y) {
+        for (let obstacle of obstacles) {
+            if (x < obstacle.x + obstacle.width &&
+                x + squareSize > obstacle.x &&
+                y < obstacle.y + obstacle.height &&
+                y + squareSize > obstacle.y) {
+                gameOverMessage.style.display = 'block';
+                document.removeEventListener('keydown', handleKeyDown);
+                clearInterval(targetMovement);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function checkWin() {
+        if (playerX < targetX + squareSize &&
+            playerX + squareSize > targetX &&
+            playerY < targetY + squareSize &&
+            playerY + squareSize > targetY) {
+            message.style.display = 'block';
+            document.removeEventListener('keydown', handleKeyDown);
+            clearInterval(targetMovement);
+        }
+    }
+
+    function generateRandomPosition() {
+        return {
+            x: Math.floor(Math.random() * (canvas.width - squareSize)),
+            y: Math.floor(Math.random() * (canvas.height - squareSize))
+        };
+    }
+
+    function generateObstacles() {
+        obstacles.length = 0;
+        for (let i = 0; i < 4; i++) {
+            const position = generateRandomPosition();
+            const obstacle = {
+                x: position.x,
+                y: position.y,
+                width: Math.random() * 50 + 10,
+                height: Math.random() * 50 + 10
+            };
+            obstacles.push(obstacle);
+        }
+    }
+
+    function initializeGame() {
+        const playerPosition = generateRandomPosition();
+        playerX = playerPosition.x;
+        playerY = playerPosition.y;
+
+        const targetPosition = generateRandomPosition();
+        targetX = targetPosition.x;
+        targetY = targetPosition.y;
+        targetDirectionX = Math.random() < 0.5 ? -1 : 1;
+        targetDirectionY = Math.random() < 0.5 ? -1 : 1;
+
+        generateObstacles();
+    }
+
+    function restartGame() {
+        message.style.display = 'none';
+        gameOverMessage.style.display = 'none';
+        document.addEventListener('keydown', handleKeyDown);
+
+        initializeGame();
+        clearInterval(targetMovement);
+        targetMovement = setInterval(() => {
+            moveTarget();
+            draw();
+        }, 50);
+
+        draw();
+    }
+
+    function handleKeyDown(event) {
+        updatePosition(event.key);
+    }
+
+    function handleTouch(event) {
+        const direction = event.target.id;
+        const directionMap = {
+            up: 'ArrowUp',
+            down: 'ArrowDown',
+            left: 'ArrowLeft',
+            right: 'ArrowRight'
+        };
+        updatePosition(directionMap[direction]);
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.getElementById('up').addEventListener('touchstart', handleTouch);
+    document.getElementById('down').addEventListener('touchstart', handleTouch);
+    document.getElementById('left').addEventListener('touchstart', handleTouch);
+    document.getElementById('right').addEventListener('touchstart', handleTouch);
+
+    initializeGame();
+    targetMovement = setInterval(() => {
+        moveTarget();
+        draw();
+    }, 50);
+
+    draw();
+</script>
+
+</body>
+</html>
